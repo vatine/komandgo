@@ -65,6 +65,7 @@ func TestScanning(t *testing.T) {
 		{"130Hräksmörgås", "räksmörgås", true},
 		{"3H1H1", "1H1", false},
 		{"13%Hhalvah", "", true},
+		{"4Hräksmörgås", "räk", false},
 	}
 
 	for ix, td := range testData {
