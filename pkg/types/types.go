@@ -9,6 +9,7 @@ import (
 type ConfNo uint16
 type TextNo uint32
 type AuxNo uint32
+type SessionNo uint32
 
 type AuxItem struct {
 	AuxNo     AuxNo
@@ -106,7 +107,7 @@ type Person struct {
 	Flags               PersonalFlags
 	LastLogin           time.Time
 	UserArea            TextNo
-	TitalTimePresent    unit32
+	TotalTimePresent    uint32
 	Sessions            uint32
 	CreatedLines        uint32
 	CreatedBytes        uint32
@@ -166,7 +167,7 @@ type Membership struct {
 type MembershipOld struct {
 	LastTimeRead time.Time
 	Conference   ConfNo
-	LastTextRead textNo
+	LastTextRead TextNo
 	ReadTexts    []TextNo
 }
 
@@ -223,7 +224,7 @@ type TextStat struct {
 
 type WhoInfoOld struct {
 	Person            ConfNo
-	WorkingConference ConfNO
+	WorkingConference ConfNo
 	WhatAmIDoing      string
 }
 
@@ -250,7 +251,7 @@ type SessionInfo struct {
 	WorkingConference ConfNo
 	Session           SessionNo
 	WhatAmIDoing      string
-	UserName          srting
+	UserName          string
 	IdleTime          uint32
 	ConnectionTime    time.Time
 }
@@ -260,7 +261,7 @@ type SessionInfoIdent struct {
 	WorkingConference ConfNo
 	Session           SessionNo
 	WhatAmIDoing      string
-	UserName          srting
+	UserName          string
 	HostName          string
 	IdentUser         string
 	IdleTime          uint32
