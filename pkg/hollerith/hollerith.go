@@ -25,6 +25,11 @@ func Fprintf(sink io.Writer, f string, args... interface{}) (int, error) {
 	return Fprint(sink, i)
 }
 
+func Sprint(s interface{}) string {
+	i := fmt.Sprint(s)
+	return fmt.Sprintf("%dH%s", len(i), i)
+}
+
 func Scan(source io.RuneReader) (string, error) {
 	l := 0
 
