@@ -131,6 +131,39 @@ func (k *KomClient) asyncChangeName(conference, newName string) (chan genericRes
 	return rv, k.send(req)
 }
 
+// This sends the :change-what-i-am-doing" protocol request (#4)
+func (k *KomClient) asyncCHangeWhatIAmDoing(msg string) (chan genericResponse, error) {
+	rv := make(chan genericResponse)
+
+	reqId := k.registerCallback(genericCallback(rv))
+
+	req := fmt.Sprintf("%d 4 %s", reqId, hollerith.Sprint(msg))
+
+	return rv, k.send(req)
+}
+
+// This sends the set-priv-bits protocol message (#7)
+func (k *KomClient) asyncSetPrivBits(person types.ConfNo, privBits types.PrivBits) (chan genericResponse, error) {
+	rv := make(chan genericResponse)
+
+	reqId := k.registerCallback(genericCallback(rv))
+
+	req := fmt.Sprintf("%d 7 %d %s", reqId, person, privBits.Repr())
+
+	return rv, k.send(req)
+}
+
+// This sends the set-passwd protocol message (#8)
+func (k *KomClient) asyncChangePassword(person types.ConfNo, oldPasswd, newPasswd string) (chan genericResponse, error) {
+	rv := make(chan genericResponse)
+
+	reqId := k.registerCallback(genericCallback(rv))
+
+	req := fmt.Sprintf("%d 8 %d %s %s", reqId, person, hollerith.Sprint(oldPasswd), hollerith.Sprint(newPasswd))
+
+	return rv, k.send(req)
+}
+
 // This sends the "login" protocol message (# 62) and returns a
 // channel suitable to see if there was an error or not.
 func (k *KomClient) asyncLogin(userName, password string, invisible bool) (chan genericResponse, error) {
@@ -141,12 +174,7 @@ func (k *KomClient) asyncLogin(userName, password string, invisible bool) (chan 
 	rv := make(chan genericResponse)
 	persNo := k.PersonFromName(userName)
 	
-	k.mapLock.Lock()
-	defer k.mapLock.Unlock()
-
-	reqId := k.nextRequest
-	k.nextRequest++
-	k.asyncMap[reqId] = genericCallback(rv)
+	reqId := k.registerCallback(genericCallback(rv))
 
 	req := fmt.Sprintf("%d 62 %d %s %d", reqId, persNo, hollerith.Sprint(password), visibility)
 	err := k.send(req)
