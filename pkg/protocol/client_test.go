@@ -1,4 +1,5 @@
 package protocol
+
 // Various client implementation tests
 
 import (
@@ -10,13 +11,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-
-
 func TestReadID(t *testing.T) {
 	logrus.SetLevel(logrus.DebugLevel)
-	
-	td := []struct{
-		data string
+
+	td := []struct {
+		data     string
 		expected uint32
 	}{
 		{"2 ", 2}, {"2 22", 2}, {"22 ", 22}, {"012", 12},
@@ -35,14 +34,14 @@ func TestReadID(t *testing.T) {
 // Create a fake client, with specific data to read
 func fakeClient(data string) *KomClient {
 	return &KomClient{
-		socket: bytes.NewBufferString(data),
+		socket:   bytes.NewBufferString(data),
 		asyncMap: make(map[uint32]Callback),
 		shutdown: make(chan struct{}),
 	}
 }
 
 func TestReadOKAndError(t *testing.T) {
-	td := []struct{
+	td := []struct {
 		data string
 		err  bool
 	}{

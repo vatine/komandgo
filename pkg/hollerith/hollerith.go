@@ -20,7 +20,7 @@ func Fprint(sink io.Writer, s interface{}) (int, error) {
 	return fmt.Fprintf(sink, "%dH%s", len(i), i)
 }
 
-func Fprintf(sink io.Writer, f string, args... interface{}) (int, error) {
+func Fprintf(sink io.Writer, f string, args ...interface{}) (int, error) {
 	i := fmt.Sprintf(f, args...)
 	return Fprint(sink, i)
 }
@@ -45,7 +45,7 @@ func Scan(source io.RuneReader) (string, error) {
 			p := strings.IndexRune("0123456789", r)
 			fmt.Printf("p = %d, r = %c\n", p, r)
 			if p >= 0 {
-				l = l * 10 + p
+				l = l*10 + p
 			} else {
 				return "", HollerithError("Unexpected length character")
 			}

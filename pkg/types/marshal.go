@@ -36,7 +36,7 @@ func (p PrivBits) Repr() string {
 	if p.ChangeName {
 		tmp |= 1
 	}
-	
+
 	tmp <<= 10
 
 	return fmt.Sprintf("%016b", tmp)

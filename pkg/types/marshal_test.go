@@ -4,7 +4,6 @@ import (
 	"testing"
 )
 
-
 func TestPrivBits(t *testing.T) {
 	cases := []struct {
 		privBits PrivBits
