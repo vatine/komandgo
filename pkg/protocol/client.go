@@ -1,4 +1,5 @@
 package protocol
+
 // Protocol implementation for the KomAndGo clinet
 
 import (
@@ -8,7 +9,7 @@ import (
 	"sync"
 
 	log "github.com/sirupsen/logrus"
-	
+
 	"github.com/vatine/komandgo/pkg/hollerith"
 	"github.com/vatine/komandgo/pkg/types"
 )
@@ -27,12 +28,12 @@ type Callback interface {
 // The mapLock serves a dual purpose, it locks the nextRequest counter
 // and it synchronises access to the asyncMap
 type KomClient struct {
-	mapLock sync.Mutex
-	socket io.ReadWriter
-	asyncMap map[uint32]Callback
+	mapLock     sync.Mutex
+	socket      io.ReadWriter
+	asyncMap    map[uint32]Callback
 	nextRequest uint32
-	server *KomServer
-	shutdown chan struct{}
+	server      *KomServer
+	shutdown    chan struct{}
 }
 
 func NewKomClient(name string) (*KomClient, error) {
@@ -46,7 +47,7 @@ func NewKomClient(name string) (*KomClient, error) {
 func internalNewClient(name string, server *KomServer) (*KomClient, error) {
 	rv := KomClient{
 		asyncMap: make(map[uint32]Callback),
-		server: server,
+		server:   server,
 	}
 	s, err := net.Dial("tcp", name)
 	if err != nil {
@@ -99,12 +100,12 @@ func (c genericCallback) OK(r io.Reader) {
 
 func (c genericCallback) Error(r io.Reader) {
 	var errorCode, errorStatus, reqID uint32
-	
+
 	n, err := fmt.Fscanf(r, "%d %d", &reqID, &errorCode, &errorStatus)
 	skipToNewline(r)
 	if err != nil || n != 2 {
 		log.WithFields(log.Fields{
-			"n": n,
+			"n":     n,
 			"error": err,
 		}).Errorf("Generic Callback, fscanf error.")
 		c <- genericResponse{err}
@@ -144,7 +145,7 @@ func (k *KomClient) getCallback(id uint32) (Callback, error) {
 	}
 	delete(k.asyncMap, id)
 	return c, nil
-	
+
 }
 
 // Send a protocol string to the server, handle any and all errors.
@@ -168,17 +169,17 @@ func (k *KomClient) send(s string) error {
 	}
 
 	k.socket.Write([]byte{10})
-	
+
 	return nil
 }
 
-// Run a continuous read loop on the 
+// Run a continuous read loop on the
 func (k *KomClient) receiveLoop() {
 	done := false
 
 	for !done {
 		select {
-		case _, ok := <- k.shutdown:
+		case _, ok := <-k.shutdown:
 			_ = ok
 			done = true
 			continue
@@ -193,7 +194,7 @@ func (k *KomClient) receiveLoop() {
 				callback.Error(k.socket)
 			}
 		}
-		
+
 	}
 }
 
@@ -207,8 +208,8 @@ func readID(r io.Reader) uint32 {
 		if err != nil {
 			log.WithFields(log.Fields{
 				"error": err,
-				"b": b,
-				"rv": rv,
+				"b":     b,
+				"rv":    rv,
 			}).Error("read id")
 			return rv
 		}
@@ -220,7 +221,7 @@ func readID(r io.Reader) uint32 {
 
 		switch {
 		case (b >= '0') && (b <= '9'):
-			rv = (10 * rv) + uint32(b - '0')
+			rv = (10 * rv) + uint32(b-'0')
 		default:
 			done = true
 		}
@@ -230,7 +231,6 @@ func readID(r io.Reader) uint32 {
 }
 
 // Various protocol messages
-
 
 // Log out, but don't terminate the current session, this is protocol message #1
 func (k *KomClient) asyncLogout() (chan genericResponse, error) {
@@ -349,7 +349,7 @@ func (k *KomClient) asyncLogin(userName, password string, invisible bool) (chan 
 	}
 	rv := make(chan genericResponse)
 	persNo := k.PersonFromName(userName)
-	
+
 	reqID := k.registerCallback(genericCallback(rv))
 
 	req := fmt.Sprintf("%d 62 %d %s %d", reqID, persNo, hollerith.Sprint(password), visibility)
@@ -357,8 +357,6 @@ func (k *KomClient) asyncLogin(userName, password string, invisible bool) (chan 
 
 	return rv, err
 }
-
-
 
 // Various utility functions
 

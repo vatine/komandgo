@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestBasicPrinting (t *testing.T) {
+func TestBasicPrinting(t *testing.T) {
 	sink := bytes.NewBuffer(nil)
 
 	testData := []struct {
@@ -25,17 +25,17 @@ func TestBasicPrinting (t *testing.T) {
 			continue
 		}
 	}
-		
+
 }
 
-func TestFormattedPrinting (t *testing.T) {
+func TestFormattedPrinting(t *testing.T) {
 	sink := bytes.NewBuffer(nil)
 
 	testData := []struct {
 		f        string
 		data     []interface{}
 		expected string
-	} {
+	}{
 		{"%d%d%d", []interface{}{1, 2, 3}, "3H123"},
 		{"%d%s", []interface{}{1, "23"}, "3H123"},
 		{"%d", []interface{}{-4711}, "5H-4711"},
@@ -56,7 +56,7 @@ func TestFormattedPrinting (t *testing.T) {
 }
 
 func TestScanning(t *testing.T) {
-	testData := []struct{
+	testData := []struct {
 		source   string
 		expected string
 		err      bool
@@ -82,6 +82,6 @@ func TestScanning(t *testing.T) {
 		case seen != td.expected:
 			t.Errorf("Saw %s, expected %s, ix %d", seen, td.expected, ix)
 		}
-		
+
 	}
 }
