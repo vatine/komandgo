@@ -340,6 +340,32 @@ func (k *KomClient) asyncSetPresentation(conference string, text types.TextNo) (
 	return rv, err
 }
 
+// This sends the set-etc-motd protocol message (#17) and returns a
+// channel suitable to see if there was an error or not.
+func (k *KomClient) asyncSetEtcMotd(conference string, text types.TextNo) (chan genericResponse, error) {
+	rv := make(chan genericResponse)
+	confID := k.ConferenceFromName(conference)
+	reqID := k.registerCallback(genericCallback(rv))
+	req := fmt.Sprintf("%d 17 %d %d", reqID, confID, text)
+
+	err := k.send(req)
+	return rv, err
+}
+
+// This sends the set-supervisor protocol message (#18) and returns a
+// channel suitable to see if there was an error or not.
+func (k *KomClient) asyncSetSupervisor(conference, admin string) (chan genericResponse, error) {
+	rv := make(chan genericResponse)
+	confID := k.ConferenceFromName(conference)
+	adminID := k.ConferenceFromName(conference)
+	reqID := k.registerCallback(genericCallback(rv))
+	req := fmt.Sprintf("%d 18 %d %d", reqID, confID, adminID)
+
+	err := k.send(req)
+	return rv, err
+	
+}
+
 // This sends the "login" protocol message (# 62) and returns a
 // channel suitable to see if there was an error or not.
 func (k *KomClient) asyncLogin(userName, password string, invisible bool) (chan genericResponse, error) {
