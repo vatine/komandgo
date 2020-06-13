@@ -10,14 +10,13 @@ import (
 	"github.com/vatine/komandgo/pkg/types"
 )
 
-
 // The KomServer data structure
 type KomServer struct {
-	client *KomClient
-	personLock sync.Mutex
-	userNameMap map[string]types.ConfNo
+	client         *KomClient
+	personLock     sync.Mutex
+	userNameMap    map[string]types.ConfNo
 	conferenceLock sync.Mutex
-	conferenceMap map[string]types.ConfNo
+	conferenceMap  map[string]types.ConfNo
 }
 
 var serverLock sync.Mutex
@@ -25,7 +24,7 @@ var serverMap map[string]*KomServer
 
 func GetServer(name string) (*KomServer, error) {
 	var err error
-	
+
 	serverLock.Lock()
 	defer serverLock.Unlock()
 
