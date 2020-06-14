@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
+	"strings"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -66,8 +68,41 @@ func skipToNewline(r io.Reader) {
 			log.WithFields(log.Fields{
 				"error": err,
 			}).Error("error skipping to newline")
+			return
 		}
 	}
+}
+
+// Read from a stream until we've read a full delimited list, then
+// return a string that is composed of the read bytes. If the start is
+// sent in as 0, we skip matching the start. On error, simply return
+// what's been read so far and the error seen
+func readDelimitedList(start, end byte, r io.Reader) (string, error) {
+	var rv []byte
+
+	b, err := readByte(r)
+	if err != nil || (start != 0 && b != start) {
+		log.WithFields(log.Fields{
+			"b": b,
+			"start": start,
+			"end": end,
+		}).Error("Unexpected start of list")
+		return "", fmt.Errorf("Unexpected start '%c'", b)
+	}
+	rv = append(rv, b)
+
+	for  {
+		b, err := readByte(r)
+		if err != nil {
+			return string(rv), err
+		}
+		rv = append(rv, b)
+		if b == end {
+			return string(rv), nil
+		}
+	}
+
+	return "", nil
 }
 
 // Read a single byte from an io.Reader
@@ -95,7 +130,7 @@ type genericResponse struct {
 type genericCallback chan genericResponse
 
 func (c genericCallback) OK(r io.Reader) {
-	c <- genericResponse{nil}
+	go func() {c <- genericResponse{nil}}()
 }
 
 func (c genericCallback) Error(r io.Reader) {
@@ -108,14 +143,139 @@ func (c genericCallback) Error(r io.Reader) {
 			"n":     n,
 			"error": err,
 		}).Errorf("Generic Callback, fscanf error.")
-		c <- genericResponse{err}
+		go func() {c <- genericResponse{err}}()
 		return
 	}
 
 	resp := genericResponse{
 		err: fmt.Errorf("Generic error, code %d, status %d", errorCode, errorStatus),
 	}
-	c <- resp
+	go func() {c <- resp}()
+}
+
+// The get-marks response structure
+type getMarksResponse struct {
+	marks []types.Mark
+	err   error
+}
+
+type getMarksCallback chan getMarksResponse
+
+func (g getMarksCallback) OK(r io.Reader) {
+	marks := readUInt32(r)
+	marksArr := make([]types.Mark, marks)
+
+	ar, err := readDelimitedList('{', '}', r)
+	skipToNewline(r)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+			"marks": marks,
+		}).Error("Failed to read delimited list")
+		go func() {g <- getMarksResponse{err: err}}()
+		return
+	}
+
+	tmp := strings.Split(ar, " ")
+	log.WithFields(log.Fields{
+		"marks": marks,
+		"array": ar,
+		"tmp": tmp,
+	}).Debug("get marks")
+
+	rv := getMarksResponse{}
+	
+	strPos := 0
+	if tmp[strPos] == "{" {
+		strPos++
+	}
+	
+	for ix := 0; ix < int(marks); ix++ {
+		n, err := strconv.Atoi(tmp[strPos])
+		if err != nil {
+			log.WithFields(log.Fields{
+				"ix": ix,
+				"strPos": strPos,
+				"tmp[strPos]": tmp[strPos],
+			}).Error("parsing textNo")
+			rv.marks = marksArr[0:ix]
+			rv.err = err
+			go func() {g <- rv}()
+			return
+		}
+		strPos++
+		marksArr[ix].TextNo = types.TextNo(n)
+
+		n, err = strconv.Atoi(tmp[strPos])
+		if err != nil {
+			log.WithFields(log.Fields{
+				"ix": ix,
+				"strPos": strPos,
+				"tmp[strPos]": tmp[strPos],
+			}).Error("parsing textNo")
+			rv.marks = marksArr[0:ix]
+			rv.err = err
+			go func() {g <- rv}()
+			return
+		}
+		strPos++
+		marksArr[ix].Type = byte(n)
+	}
+	rv.marks = marksArr
+	go func() {g <- rv}()
+}
+
+func (g getMarksCallback) Error(r io.Reader) {
+	var errorCode, errorStatus, reqID uint32
+
+	n, err := fmt.Fscanf(r, "%d %d", &reqID, &errorCode, &errorStatus)
+	skipToNewline(r)
+	if err != nil || n != 2 {
+		log.WithFields(log.Fields{
+			"n":     n,
+			"error": err,
+		}).Errorf("Generic Callback, fscanf error.")
+		go func() {g <- getMarksResponse{err: err}}()
+		return
+	}
+
+	resp := getMarksResponse{
+		err: fmt.Errorf("Generic error, code %d, status %d", errorCode, errorStatus),
+	}
+	go func() {g <- resp}()
+}
+
+// Read an uint32 from the client socket, also consume the first
+// whitespace after the number.
+func readUInt32(r io.Reader) uint32 {
+	var done bool
+	var rv uint32
+
+	for !done {
+		b, err := readByte(r)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+				"b":     b,
+				"rv":    rv,
+			}).Error("read id")
+			return rv
+		}
+		log.WithFields(log.Fields{
+			"0": '0',
+			"9": '9',
+			"b": b,
+		}).Debug("read id")
+
+		switch {
+		case (b >= '0') && (b <= '9'):
+			rv = (10 * rv) + uint32(b-'0')
+		default:
+			done = true
+		}
+	}
+
+	return rv
 }
 
 // Register a callback and return the corresponding request ID
@@ -185,7 +345,7 @@ func (k *KomClient) receiveLoop() {
 			continue
 		default:
 			status, _ := readByte(k.socket)
-			id := readID(k.socket)
+			id := readUInt32(k.socket)
 			callback, _ := k.getCallback(id)
 			switch {
 			case status == '=':
@@ -198,37 +358,6 @@ func (k *KomClient) receiveLoop() {
 	}
 }
 
-// Read an id from the client socket, also consumer the first whitespace after
-func readID(r io.Reader) uint32 {
-	var done bool
-	var rv uint32
-
-	for !done {
-		b, err := readByte(r)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"error": err,
-				"b":     b,
-				"rv":    rv,
-			}).Error("read id")
-			return rv
-		}
-		log.WithFields(log.Fields{
-			"0": '0',
-			"9": '9',
-			"b": b,
-		}).Debug("read id")
-
-		switch {
-		case (b >= '0') && (b <= '9'):
-			rv = (10 * rv) + uint32(b-'0')
-		default:
-			done = true
-		}
-	}
-
-	return rv
-}
 
 // Various protocol messages
 
@@ -363,8 +492,72 @@ func (k *KomClient) asyncSetSupervisor(conference, admin string) (chan genericRe
 
 	err := k.send(req)
 	return rv, err
-	
 }
+
+// This sends the set-permitter-submitters protocol message (#19) and returns a
+// channel suitable to see if there was an error or not.
+func (k *KomClient) asyncSetPermitterSubmitters(conference, permitted string) (chan genericResponse, error) {
+	rv := make(chan genericResponse)
+	confID := k.ConferenceFromName(conference)
+	permSubID := k.ConferenceFromName(conference)
+	reqID := k.registerCallback(genericCallback(rv))
+	req := fmt.Sprintf("%d 19 %d %d", reqID, confID, permSubID)
+
+	err := k.send(req)
+	return rv, err
+}
+
+// This sends the set-super-conf protocol message (#20) and returns a
+// channel suitable to see if there was an error or not.
+func (k *KomClient) asyncSetSuperConf(conference, permitted string) (chan genericResponse, error) {
+	rv := make(chan genericResponse)
+	confID := k.ConferenceFromName(conference)
+	superID := k.ConferenceFromName(conference)
+	reqID := k.registerCallback(genericCallback(rv))
+	req := fmt.Sprintf("%d 20 %d %d", reqID, confID, superID)
+
+	err := k.send(req)
+	return rv, err
+}
+
+// This sends the set-conf-type protocol message (#21) and returns a
+// channel suitable to see if there was an error or not.
+func (k *KomClient) asyncSetConfTypef(conference string, confType types.AnyConfType) (chan genericResponse, error) {
+	rv := make(chan genericResponse)
+	confID := k.ConferenceFromName(conference)
+
+	reqID := k.registerCallback(genericCallback(rv))
+	req := fmt.Sprintf("%d 21 %d %s", reqID, confID, confType.BitField())
+
+	err := k.send(req)
+	return rv, err
+}
+
+// This sends the set-garb-nice protocol message (#22) and returns a
+// channel suitable to see if there was an error or not.
+func (k *KomClient) asyncSetGarbNice(conference string, nice uint32) (chan genericResponse, error) {
+	rv := make(chan genericResponse)
+	confID := k.ConferenceFromName(conference)
+
+	reqID := k.registerCallback(genericCallback(rv))
+	req := fmt.Sprintf("%d 22 %d %d", reqID, confID, nice)
+
+	err := k.send(req)
+	return rv, err
+}
+
+// This sends the get-marks protocol message (#23) and returns a
+// channel suitable to return an array of marks or an error.
+func (k *KomClient) asyncGetMarks() (chan getMarksResponse, error) {
+	rv := make(chan getMarksResponse)
+
+	reqID := k.registerCallback(getMarksCallback(rv))
+	req := fmt.Sprintf("%d 23", reqID)
+
+	err := k.send(req)
+	return rv, err
+}
+
 
 // This sends the "login" protocol message (# 62) and returns a
 // channel suitable to see if there was an error or not.
