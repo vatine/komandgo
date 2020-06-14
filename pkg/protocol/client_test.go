@@ -67,7 +67,7 @@ func TestReadOKAndError(t *testing.T) {
 }
 
 func TestGetMarksResponse(t *testing.T) {
-	cases := []struct{
+	cases := []struct {
 		data  string
 		marks int
 		err   bool
@@ -94,5 +94,5 @@ func TestGetMarksResponse(t *testing.T) {
 			}
 		}
 	}
-	
+
 }
