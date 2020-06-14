@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func TestReadID(t *testing.T) {
+func TestReadUInt(t *testing.T) {
 	logrus.SetLevel(logrus.DebugLevel)
 
 	td := []struct {
@@ -23,7 +23,7 @@ func TestReadID(t *testing.T) {
 	}
 
 	for ix, d := range td {
-		seen := readID(strings.NewReader(d.data))
+		seen := readUInt32(strings.NewReader(d.data))
 		expected := d.expected
 		if seen != expected {
 			t.Errorf("Case #%d, saw %d, expected %d", ix, seen, expected)
@@ -64,4 +64,35 @@ func TestReadOKAndError(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestGetMarksResponse(t *testing.T) {
+	cases := []struct{
+		data  string
+		marks int
+		err   bool
+	}{
+		{"=1 3 { 13020 100 13043 95 12213 95 }", 3, false},
+		{"=1 4 { 13020 100 13043 95 12213 95 }", 3, true},
+	}
+	for ix, test := range cases {
+		c := fakeClient(test.data)
+		rv := make(chan getMarksResponse)
+		c.asyncMap[1] = getMarksCallback(rv)
+		go c.receiveLoop()
+		seen := <-rv
+		if len(seen.marks) != test.marks {
+			t.Errorf("Case #%d, unxpected number of marks, saw %d, expected %d", ix, len(seen.marks), test.marks)
+		}
+		if seen.err != nil {
+			if !test.err {
+				t.Errorf("Case #%d, unexpected error %v", ix, seen)
+			}
+		} else {
+			if test.err {
+				t.Errorf("Case #%d, expected error, saw nil", ix)
+			}
+		}
+	}
+	
 }
