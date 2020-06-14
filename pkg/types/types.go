@@ -52,12 +52,13 @@ type ExtendedConfType struct {
 	LetterBox      bool
 	AllowAnonymous bool
 	ForbidSecret   bool
-	Resevred2      bool
+	Reserved2      bool
 	Reserved3      bool
 }
 
 type AnyConfType interface {
 	isConfType() bool
+	BitField() string
 }
 
 func (t ConfType) isConfType() bool {
@@ -66,6 +67,48 @@ func (t ConfType) isConfType() bool {
 
 func (t ExtendedConfType) isConfType() bool {
 	return true
+}
+
+func (t ConfType) BitField() string {
+	ar := []byte("0000")
+	if t.RdProt {
+		ar[0] = '1'
+	}
+	if t.Original {
+		ar[1] = '1'
+	}
+	if t.Secret {
+		ar[2] = '1'
+	}
+	if t.LetterBox {
+		ar[3] = '1'
+	}
+
+	return string(ar)
+}
+
+func (t ExtendedConfType) BitField() string {
+	ar := []byte("00000000")
+	if t.RdProt {
+		ar[0] = '1'
+	}
+	if t.Original {
+		ar[1] = '1'
+	}
+	if t.Secret {
+		ar[2] = '1'
+	}
+	if t.LetterBox {
+		ar[3] = '1'
+	}
+	if t.AllowAnonymous {
+		ar[4] = '1'
+	}
+	if t.ForbidSecret {
+		ar[5] = '1'
+	}
+
+	return string(ar)
 }
 
 type OldConferece struct {
