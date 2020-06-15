@@ -83,15 +83,15 @@ func readDelimitedList(start, end byte, r io.Reader) (string, error) {
 	b, err := readByte(r)
 	if err != nil || (start != 0 && b != start) {
 		log.WithFields(log.Fields{
-			"b": b,
+			"b":     b,
 			"start": start,
-			"end": end,
+			"end":   end,
 		}).Error("Unexpected start of list")
 		return "", fmt.Errorf("Unexpected start '%c'", b)
 	}
 	rv = append(rv, b)
 
-	for  {
+	for {
 		b, err := readByte(r)
 		if err != nil {
 			return string(rv), err
@@ -130,7 +130,7 @@ type genericResponse struct {
 type genericCallback chan genericResponse
 
 func (c genericCallback) OK(r io.Reader) {
-	go func() {c <- genericResponse{nil}}()
+	go func() { c <- genericResponse{nil} }()
 }
 
 func (c genericCallback) Error(r io.Reader) {
@@ -143,14 +143,14 @@ func (c genericCallback) Error(r io.Reader) {
 			"n":     n,
 			"error": err,
 		}).Errorf("Generic Callback, fscanf error.")
-		go func() {c <- genericResponse{err}}()
+		go func() { c <- genericResponse{err} }()
 		return
 	}
 
 	resp := genericResponse{
 		err: fmt.Errorf("Generic error, code %d, status %d", errorCode, errorStatus),
 	}
-	go func() {c <- resp}()
+	go func() { c <- resp }()
 }
 
 // The get-marks response structure
@@ -172,7 +172,7 @@ func (g getMarksCallback) OK(r io.Reader) {
 			"error": err,
 			"marks": marks,
 		}).Error("Failed to read delimited list")
-		go func() {g <- getMarksResponse{err: err}}()
+		go func() { g <- getMarksResponse{err: err} }()
 		return
 	}
 
@@ -180,27 +180,27 @@ func (g getMarksCallback) OK(r io.Reader) {
 	log.WithFields(log.Fields{
 		"marks": marks,
 		"array": ar,
-		"tmp": tmp,
+		"tmp":   tmp,
 	}).Debug("get marks")
 
 	rv := getMarksResponse{}
-	
+
 	strPos := 0
 	if tmp[strPos] == "{" {
 		strPos++
 	}
-	
+
 	for ix := 0; ix < int(marks); ix++ {
 		n, err := strconv.Atoi(tmp[strPos])
 		if err != nil {
 			log.WithFields(log.Fields{
-				"ix": ix,
-				"strPos": strPos,
+				"ix":          ix,
+				"strPos":      strPos,
 				"tmp[strPos]": tmp[strPos],
 			}).Error("parsing textNo")
 			rv.marks = marksArr[0:ix]
 			rv.err = err
-			go func() {g <- rv}()
+			go func() { g <- rv }()
 			return
 		}
 		strPos++
@@ -209,20 +209,20 @@ func (g getMarksCallback) OK(r io.Reader) {
 		n, err = strconv.Atoi(tmp[strPos])
 		if err != nil {
 			log.WithFields(log.Fields{
-				"ix": ix,
-				"strPos": strPos,
+				"ix":          ix,
+				"strPos":      strPos,
 				"tmp[strPos]": tmp[strPos],
 			}).Error("parsing textNo")
 			rv.marks = marksArr[0:ix]
 			rv.err = err
-			go func() {g <- rv}()
+			go func() { g <- rv }()
 			return
 		}
 		strPos++
 		marksArr[ix].Type = byte(n)
 	}
 	rv.marks = marksArr
-	go func() {g <- rv}()
+	go func() { g <- rv }()
 }
 
 func (g getMarksCallback) Error(r io.Reader) {
@@ -235,14 +235,14 @@ func (g getMarksCallback) Error(r io.Reader) {
 			"n":     n,
 			"error": err,
 		}).Errorf("Generic Callback, fscanf error.")
-		go func() {g <- getMarksResponse{err: err}}()
+		go func() { g <- getMarksResponse{err: err} }()
 		return
 	}
 
 	resp := getMarksResponse{
 		err: fmt.Errorf("Generic error, code %d, status %d", errorCode, errorStatus),
 	}
-	go func() {g <- resp}()
+	go func() { g <- resp }()
 }
 
 // Read an uint32 from the client socket, also consume the first
@@ -357,7 +357,6 @@ func (k *KomClient) receiveLoop() {
 
 	}
 }
-
 
 // Various protocol messages
 
@@ -557,7 +556,6 @@ func (k *KomClient) asyncGetMarks() (chan getMarksResponse, error) {
 	err := k.send(req)
 	return rv, err
 }
-
 
 // This sends the "login" protocol message (# 62) and returns a
 // channel suitable to see if there was an error or not.
