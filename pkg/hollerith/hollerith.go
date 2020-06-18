@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
+
+	"github.com/vatine/komandgo/pkg/utils"
 )
 
 type HollerithError string
@@ -30,36 +34,42 @@ func Sprint(s interface{}) string {
 	return fmt.Sprintf("%dH%s", len(i), i)
 }
 
-func Scan(source io.RuneReader) (string, error) {
+func Scan(source io.Reader) (string, error) {
 	l := 0
 
 	for done := false; !done; _ = done {
-		r, _, e := source.ReadRune()
+		b, e := utils.ReadByte(source)
 
 		if e != nil {
 			return "", e
 		}
 
-		done = (r == 'H')
+		done = (b == 'H')
 		if !done {
-			p := strings.IndexRune("0123456789", r)
-			fmt.Printf("p = %d, r = %c\n", p, r)
+			p := strings.IndexByte("0123456789", b)
+			log.WithFields(log.Fields{
+				"p": p,
+				"b": b,
+			}).Debug("reading length")
 			if p >= 0 {
 				l = l*10 + p
 			} else {
+				log.WithFields(log.Fields{
+					"p": p,
+					"b": b,
+				}).Error("unexpected character")
 				return "", HollerithError("Unexpected length character")
 			}
 		}
 	}
 
-	rv := []rune{}
-	for c := 0; c < l; _ = c {
-		r, cnt, e := source.ReadRune()
+	rv := []byte{}
+	for c := 0; c < l; c++ {
+		b, e := utils.ReadByte(source)
 		if e != nil {
 			return "", e
 		}
-		c += cnt
-		rv = append(rv, r)
+		rv = append(rv, b)
 	}
 
 	return string(rv), nil
