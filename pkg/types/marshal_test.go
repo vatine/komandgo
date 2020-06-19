@@ -22,3 +22,22 @@ func TestPrivBits(t *testing.T) {
 		}
 	}
 }
+
+func TestTextNoSlice(t *testing.T) {
+	cases := []struct {
+		slice    []TextNo
+		expected string
+	}{
+		{[]TextNo{1, 2, 3}, "3 { 1 2 3 }"},
+		{[]TextNo{1, 2, 3, 2, 1}, "5 { 1 2 3 2 1 }"},
+		
+	}
+	
+
+	for ix, c := range cases {
+		seen := TextNoArray(c.slice)
+		if seen != c.expected {
+			t.Errorf("case #%d, saw <%s> expected <%s>", ix, seen, c.expected)
+		}
+	}
+}
