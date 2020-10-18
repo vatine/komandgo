@@ -30,9 +30,7 @@ func TestTextNoSlice(t *testing.T) {
 	}{
 		{[]TextNo{1, 2, 3}, "3 { 1 2 3 }"},
 		{[]TextNo{1, 2, 3, 2, 1}, "5 { 1 2 3 2 1 }"},
-		
 	}
-	
 
 	for ix, c := range cases {
 		seen := TextNoArray(c.slice)
