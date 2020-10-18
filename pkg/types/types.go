@@ -247,6 +247,7 @@ type MiscInfo struct {
 }
 
 type InfoType uint8
+
 const (
 	Recipient = InfoType(iota)
 	CCRecipient
@@ -260,7 +261,6 @@ const (
 	SentAt
 	BCCRecipient
 )
-	
 
 type TextStatOld struct {
 	CreationTime time.Time

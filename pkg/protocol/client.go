@@ -621,6 +621,15 @@ func (k *KomClient) asyncDeleteText(text types.TextNo) (chan genericResponse, er
 // This sends the add-recipient message (#30) and returns a channel
 // suitable for getting a success or an error.
 func (k *KomClient) asyncAddRecipient(textNo types.TextNo, conference string, recipientType types.InfoType) (chan genericResponse, error) {
+	rv := make(chan genericResponse)
+
+	confNo := k.ConferenceFromName(conference)
+
+	reqID := k.registerCallback(genericCallback(rv))
+	req := fmt.Sprintf("%d 30 %d %d %d", reqID, textNo, confNo, recipientType)
+
+	err := k.send(req)
+	return rv, err
 }
 
 // This sends the "login" protocol message (# 62) and returns a
