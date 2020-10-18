@@ -1,6 +1,6 @@
 package protocol
 
-// Protocol implementation for the KomAndGo clinet
+// Protocol implementation for the KomAndGo client
 
 import (
 	"fmt"
@@ -14,6 +14,7 @@ import (
 
 	"github.com/vatine/komandgo/pkg/hollerith"
 	"github.com/vatine/komandgo/pkg/types"
+	"github.com/vatine/komandgo/pkg/utils"
 )
 
 // A callback is expected to expose two methods, one (OK) for dealing
@@ -61,9 +62,9 @@ func internalNewClient(name string, server *KomServer) (*KomClient, error) {
 
 // Skips to the next linefeed character in the stream
 func skipToNewline(r io.Reader) {
-	c, err := readByte(r)
+	c, err := utils.ReadByte(r)
 	for c != 10 {
-		c, err = readByte(r)
+		c, err = utils.ReadByte(r)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"error": err,
@@ -80,7 +81,7 @@ func skipToNewline(r io.Reader) {
 func readDelimitedList(start, end byte, r io.Reader) (string, error) {
 	var rv []byte
 
-	b, err := readByte(r)
+	b, err := utils.ReadByte(r)
 	if err != nil || (start != 0 && b != start) {
 		log.WithFields(log.Fields{
 			"b":     b,
@@ -92,7 +93,7 @@ func readDelimitedList(start, end byte, r io.Reader) (string, error) {
 	rv = append(rv, b)
 
 	for {
-		b, err := readByte(r)
+		b, err := utils.ReadByte(r)
 		if err != nil {
 			return string(rv), err
 		}
@@ -105,32 +106,17 @@ func readDelimitedList(start, end byte, r io.Reader) (string, error) {
 	return "", nil
 }
 
-// Read a single byte from an io.Reader
-func readByte(r io.Reader) (byte, error) {
-	buf := make([]byte, 1)
-
-	for {
-		n, err := r.Read(buf)
-		if err != nil {
-			return 0, err
-		}
-		if n == 1 {
-			return buf[0], nil
-		}
-	}
-
-	return 0, nil
-}
-
 // The generic "success is empty, failure is complicated" response
 type genericResponse struct {
-	err error
+	code   uint32
+	status uint32
+	err    error
 }
 
 type genericCallback chan genericResponse
 
 func (c genericCallback) OK(r io.Reader) {
-	go func() { c <- genericResponse{nil} }()
+	go func() { c <- genericResponse{0, 0, nil}; close(c) }()
 }
 
 func (c genericCallback) Error(r io.Reader) {
@@ -143,14 +129,16 @@ func (c genericCallback) Error(r io.Reader) {
 			"n":     n,
 			"error": err,
 		}).Errorf("Generic Callback, fscanf error.")
-		go func() { c <- genericResponse{err} }()
+		go func() { c <- genericResponse{0, 0, err}; close(c) }()
 		return
 	}
 
 	resp := genericResponse{
-		err: fmt.Errorf("Generic error, code %d, status %d", errorCode, errorStatus),
+		code:   errorCode,
+		status: errorStatus,
+		err:    protocolError(errorCode, errorStatus),
 	}
-	go func() { c <- resp }()
+	go func() { c <- resp; close(c) }()
 }
 
 // The get-marks response structure
@@ -172,7 +160,7 @@ func (g getMarksCallback) OK(r io.Reader) {
 			"error": err,
 			"marks": marks,
 		}).Error("Failed to read delimited list")
-		go func() { g <- getMarksResponse{err: err} }()
+		go func() { g <- getMarksResponse{err: err}; close(g) }()
 		return
 	}
 
@@ -200,7 +188,7 @@ func (g getMarksCallback) OK(r io.Reader) {
 			}).Error("parsing textNo")
 			rv.marks = marksArr[0:ix]
 			rv.err = err
-			go func() { g <- rv }()
+			go func() { g <- rv; close(g) }()
 			return
 		}
 		strPos++
@@ -215,14 +203,14 @@ func (g getMarksCallback) OK(r io.Reader) {
 			}).Error("parsing textNo")
 			rv.marks = marksArr[0:ix]
 			rv.err = err
-			go func() { g <- rv }()
+			go func() { g <- rv; close(g) }()
 			return
 		}
 		strPos++
 		marksArr[ix].Type = byte(n)
 	}
 	rv.marks = marksArr
-	go func() { g <- rv }()
+	go func() { g <- rv; close(g) }()
 }
 
 func (g getMarksCallback) Error(r io.Reader) {
@@ -235,14 +223,50 @@ func (g getMarksCallback) Error(r io.Reader) {
 			"n":     n,
 			"error": err,
 		}).Errorf("Generic Callback, fscanf error.")
-		go func() { g <- getMarksResponse{err: err} }()
+		go func() { g <- getMarksResponse{err: err}; close(g) }()
 		return
 	}
 
 	resp := getMarksResponse{
 		err: fmt.Errorf("Generic error, code %d, status %d", errorCode, errorStatus),
 	}
-	go func() { g <- resp }()
+	go func() { g <- resp; close(g) }()
+}
+
+// The get-text reponse structure
+type getTextResponse struct {
+	text string
+	err  error
+}
+type getTextCallback chan getTextResponse
+
+func (g getTextCallback) OK(r io.Reader) {
+	s, err := hollerith.Scan(r)
+
+	go func() {
+		g <- getTextResponse{s, err}
+		close(g)
+	}()
+}
+
+func (g getTextCallback) Error(r io.Reader) {
+	var errorCode, errorStatus, reqID uint32
+
+	n, err := fmt.Fscanf(r, "%d %d", &reqID, &errorCode, &errorStatus)
+	skipToNewline(r)
+	if err != nil || n != 2 {
+		log.WithFields(log.Fields{
+			"n":     n,
+			"error": err,
+		}).Errorf("GetText Callback, fscanf error.")
+		go func() { g <- getTextResponse{err: err}; close(g) }()
+		return
+	}
+
+	resp := getTextResponse{
+		err: fmt.Errorf("Generic error, code %d, status %d", errorCode, errorStatus),
+	}
+	go func() { g <- resp; close(g) }()
 }
 
 // Read an uint32 from the client socket, also consume the first
@@ -252,7 +276,7 @@ func readUInt32(r io.Reader) uint32 {
 	var rv uint32
 
 	for !done {
-		b, err := readByte(r)
+		b, err := utils.ReadByte(r)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"error": err,
@@ -344,7 +368,7 @@ func (k *KomClient) receiveLoop() {
 			done = true
 			continue
 		default:
-			status, _ := readByte(k.socket)
+			status, _ := utils.ReadByte(k.socket)
 			id := readUInt32(k.socket)
 			callback, _ := k.getCallback(id)
 			switch {
@@ -557,6 +581,48 @@ func (k *KomClient) asyncGetMarks() (chan getMarksResponse, error) {
 	return rv, err
 }
 
+// This sends the get-text protocol message (#25) and returns a
+// channel suitable to return the text and/or an error.
+func (k *KomClient) asyncGetText(textNo types.TextNo, start, end uint32) (chan getTextResponse, error) {
+	rv := make(chan getTextResponse)
+
+	reqID := k.registerCallback(getTextCallback(rv))
+	req := fmt.Sprintf("%d 25 %d %d %d", reqID, textNo, start, end)
+
+	err := k.send(req)
+	return rv, err
+}
+
+// This sends the mark-as-read message (#27) and returns a channel
+// suitable to get success or error.
+func (k *KomClient) asyncMarkAsRead(conference string, texts []types.TextNo) (chan genericResponse, error) {
+	rv := make(chan genericResponse)
+
+	confID := k.ConferenceFromName(conference)
+	reqID := k.registerCallback(genericCallback(rv))
+	req := fmt.Sprintf("%d 27 %d %s", reqID, confID, types.TextNoArray(texts))
+
+	err := k.send(req)
+	return rv, err
+}
+
+// This sends the delete-text message (#29) and returns a channel
+// suitable for getting success or an error.
+func (k *KomClient) asyncDeleteText(text types.TextNo) (chan genericResponse, error) {
+	rv := make(chan genericResponse)
+
+	reqID := k.registerCallback(genericCallback(rv))
+	req := fmt.Sprintf("%d 29 %d", reqID, text)
+
+	err := k.send(req)
+	return rv, err
+}
+
+// This sends the add-recipient message (#30) and returns a channel
+// suitable for getting a success or an error.
+func (k *KomClient) asyncAddRecipient(textNo types.TextNo, conference string, recipientType types.InfoType) (chan genericResponse, error) {
+}
+
 // This sends the "login" protocol message (# 62) and returns a
 // channel suitable to see if there was an error or not.
 func (k *KomClient) asyncLogin(userName, password string, invisible bool) (chan genericResponse, error) {
@@ -570,6 +636,17 @@ func (k *KomClient) asyncLogin(userName, password string, invisible bool) (chan 
 	reqID := k.registerCallback(genericCallback(rv))
 
 	req := fmt.Sprintf("%d 62 %d %s %d", reqID, persNo, hollerith.Sprint(password), visibility)
+	err := k.send(req)
+
+	return rv, err
+}
+
+// This sends the "set-client-version" protocol message (#69) and
+// returns a channel suitable to see if there was an error or not.
+func (k *KomClient) asyncSetClientVersion(name, version string) (chan genericResponse, error) {
+	rv := make(chan genericResponse)
+	reqID := k.registerCallback(genericCallback(rv))
+	req := fmt.Sprintf("%d 69 %s %s", reqID, hollerith.Sprint(name), hollerith.Sprint(version))
 	err := k.send(req)
 
 	return rv, err
