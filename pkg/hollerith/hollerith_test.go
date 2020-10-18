@@ -62,6 +62,7 @@ func TestScanning(t *testing.T) {
 		err      bool
 	}{
 		{"13Hräksmörgås", "räksmörgås", false},
+		{"9Hräksmörgås", "räksmör", false},
 		{"130Hräksmörgås", "räksmörgås", true},
 		{"3H1H1", "1H1", false},
 		{"13%Hhalvah", "", true},
