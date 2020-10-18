@@ -246,6 +246,22 @@ type MiscInfo struct {
 	BCCRecipient ConfNo
 }
 
+type InfoType uint8
+const (
+	Recipient = InfoType(iota)
+	CCRecipient
+	CommentTo
+	CommentIn
+	FootnoteTo
+	FootnoteIn
+	LocalNo
+	ReceiveTime
+	SentBy
+	SentAt
+	BCCRecipient
+)
+	
+
 type TextStatOld struct {
 	CreationTime time.Time
 	Author       ConfNo
