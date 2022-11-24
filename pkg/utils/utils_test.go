@@ -2,6 +2,8 @@ package utils
 
 import (
 	"testing"
+
+	"github.com/vatine/komandgo/pkg/types"
 )
 
 func TestReadUInt32FromString(t *testing.T) {
@@ -30,7 +32,7 @@ func TestReadUInt32FromString(t *testing.T) {
 	}
 }
 
-func TestParseConfType(in string, offset int) types.ConfType {
+func TestParseConfType(t *testing.T) {
 	cases := []struct {
 		source string
 		offset int
@@ -40,8 +42,8 @@ func TestParseConfType(in string, offset int) types.ConfType {
 	for ix, c := range cases {
 		got := ParseConfType(c.source, c.offset)
 
-		if got.RdOnly != c.want.RdOnly {
-			t.Errorf("Case #%d, RdOnly saw %v, want %v", ix, got.RdOnly, c.want.RdOnly)
+		if got.RdProt != c.want.RdProt {
+			t.Errorf("Case #%d, RdProt saw %v, want %v", ix, got.RdProt, c.want.RdProt)
 		}
 		if got.Original != c.want.Original {
 			t.Errorf("Case #%d, Original saw %v, want %v", ix, got.Original, c.want.Original)
@@ -49,8 +51,8 @@ func TestParseConfType(in string, offset int) types.ConfType {
 		if got.Secret != c.want.Secret {
 			t.Errorf("Case #%d, Secret saw %v, want %v", ix, got.Secret, c.want.Secret)
 		}
-		if got.Mailbox != c.want.Mailbox {
-			t.Errorf("Case #%d, Mailbox saw %v, want %v", ix, got.Mailbox, c.want.Mailbox)
+		if got.LetterBox != c.want.LetterBox {
+			t.Errorf("Case #%d, LetterBox saw %v, want %v", ix, got.LetterBox, c.want.LetterBox)
 		}
 	}
 }
