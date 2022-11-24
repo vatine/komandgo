@@ -130,7 +130,7 @@ type OldConferece struct {
 type Conference struct {
 	Name                string
 	Type                ExtendedConfType
-	CreatiomTime        time.Time
+	CreationTime        time.Time
 	LastWritten         time.Time
 	Creator             ConfNo
 	Presentation        TextNo
@@ -140,8 +140,15 @@ type Conference struct {
 	Nice                uint32
 	KeepCommented       uint32
 	NoOfMembers         uint32
-	expire              uint32
+	Expire              uint32
 	AuxItems            []AuxItem
+}
+
+type UConference struct {
+	Name           string
+	Type           ExtendedConfType
+	HighestLocalNo TextNo
+	Nice           uint32
 }
 
 type Person struct {
@@ -159,7 +166,7 @@ type Person struct {
 	CreatedPersons      uint16
 	CreatedConferences  uint16
 	FirstCreatedLocalNo uint32
-	CreatedTextx        uint32
+	CreatedTexts        uint32
 	Marks               uint16
 	Conferences         uint16
 }
@@ -352,4 +359,16 @@ type DynamicSessionInfo struct {
 type SchedulingInfo struct {
 	Priority uint16
 	Weight   uint16
+}
+
+type ConfZInfo struct {
+	Name string
+	Type ConfType
+	No   ConfNo
+}
+
+type VersionInfo struct {
+	ProtocolVersion uint32
+	ServerSoftware  string
+	SoftwareVersion string
 }
