@@ -49,6 +49,32 @@ func ReadPersonalFlags(r io.Reader) PersonalFlags {
 	return rv
 }
 
+func ReadUInt32Array(r io.Reader) ([]uint32, error) {
+	var rv []uint32
+
+	var len int
+
+	_, err := fmt.Fscanf(r, "%d", &len)
+	if err != nil {
+		return rv, err
+	}
+
+	fmt.Fscanf(r, " { ")
+	for n := 0; n < len; n++ {
+		var next uint32
+		n, err := fmt.Fscanf(r, "%d ", &next)
+		if n != 1 || err != nil {
+			return rv, err
+		}
+
+		rv = append(rv, next)
+	}
+
+	_, err = fmt.Fscanf(r, "}")
+
+	return rv, err
+}
+
 // func ReadTime(r io.Reader) time.Time {
 // 	sec := int(readUInt32(r))
 // 	min := int(readUInt32(r))

@@ -622,6 +622,39 @@ func (uc uConfResponseCallback) Error(r io.Reader) {
 	go func() { uc <- uConfResponse{err: err}; close(uc) }()
 }
 
+type queryAsyncResponse struct {
+	messages []uint32
+	err      error
+}
+
+type queryAsyncCallback chan queryAsyncResponse
+
+func (qac queryAsyncCallback) OK(r io.Reader) {
+	acceptedCalls, err := types.ReadUInt32Array(r)
+	if err != nil {
+		go func() {
+			qac <- queryAsyncResponse{err: err}
+			close(qac)
+		}()
+	}
+
+	go func() {
+		qac <- queryAsyncResponse{messages: acceptedCalls}
+		close(qac)
+	}()
+
+}
+
+func (qac queryAsyncCallback) Error(r io.Reader) {
+	code, status, err := readError(r)
+
+	if err == nil {
+		err = protocolError(code, status)
+	}
+
+	go func() { qac <- queryAsyncResponse{err: err}; close(qac) }()
+}
+
 // Read an uint32 from the client socket, also consume the first
 // whitespace after the number.
 func readUInt32(r io.Reader) uint32 {
@@ -1361,12 +1394,45 @@ func (k *KomClient) asyncSetLastRead(conf types.ConfNo, text types.TextNo) (chan
 	return rv, err
 }
 
-// This sends the "get-uconf-stat" protocol message (#78) and retirns
+// This sends the "get-uconf-stat" protocol message (#78) and returns
 // a channel suitable for reading the result or an error from.
 func (k *KomClient) asyncGetUConfStat(conf types.ConfNo) (chan uConfResponse, error) {
 	rv := make(chan uConfResponse)
 	reqID := k.registerCallback(uConfResponseCallback(rv))
 	req := fmt.Sprintf("%d 78 %d", reqID, conf)
+	err := k.send(req)
+
+	return rv, err
+}
+
+// This sends the "set-info" protocol message (#79) and returns a
+// channel suitable for reading an OK or an error from.
+func (k *KomClient) asyncSetInfo(info types.InfoOld) (chan genericResponse, error) {
+	rv := make(chan genericResponse)
+	reqID := k.registerCallback(genericCallback(rv))
+	req := fmt.Sprintf("%d 79 %d %d %d %d %d %d", reqID, info.Version, info.ConferencePresentationConference, info.PersonPresentationConference, info.MOTDConference, info.KomNewsConference, info.MOTDOfLyskom)
+	err := k.send(req)
+
+	return rv, err
+}
+
+// This sends the "accept-async" protocol message (#80) and returns a
+// channel suitable for reading an OK or an error from.
+func (k *KomClient) asyncAcceptAsync(msgs []uint32) (chan genericResponse, error) {
+	rv := make(chan genericResponse)
+	reqID := k.registerCallback(genericCallback(rv))
+	req := fmt.Sprintf("%d 80 %s", reqID, types.UInt32Array(msgs))
+	err := k.send(req)
+
+	return rv, err
+}
+
+// This sends the "query-async" protocol message (#81) and returns a
+// channel suitable for reading the answer or an error from.
+func (k *KomClient) asyncQueryAsync() (chan queryAsyncResponse, error) {
+	rv := make(chan queryAsyncResponse)
+	reqID := k.registerCallback(queryAsyncCallback(rv))
+	req := fmt.Sprintf("%d 81", reqID)
 	err := k.send(req)
 
 	return rv, err

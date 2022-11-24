@@ -372,3 +372,12 @@ type VersionInfo struct {
 	ServerSoftware  string
 	SoftwareVersion string
 }
+
+type InfoOld struct {
+	Version                          uint32
+	ConferencePresentationConference ConfNo
+	PersonPresentationConference     ConfNo
+	MOTDConference                   ConfNo
+	KomNewsConference                ConfNo
+	MOTDOfLyskom                     TextNo
+}

@@ -286,3 +286,45 @@ func TestGetUConfStat(t *testing.T) {
 		}
 	}
 }
+
+func cmpSlice(got []uint32, want []uint32, t *testing.T) bool {
+	if len(got) != len(want) {
+		t.Errorf("slice lengths differ")
+		return false
+	}
+
+	for ix, gVal := range got {
+		wVal := want[ix]
+
+		if gVal != wVal {
+			t.Errorf("at index %d, got %d and want %d", ix, gVal, wVal)
+			return false
+		}
+	}
+
+	return true
+}
+
+func TestGetQueryAsync(t *testing.T) {
+	cases := []struct {
+		response string
+		want     []uint32
+	}{
+		{
+			"=1 7 { 0 5 7 9 11 12 13 }",
+			[]uint32{0, 5, 7, 9, 11, 12, 13},
+		},
+	}
+
+	for ix, tc := range cases {
+		cl := fakeClient(tc.response)
+		rv := make(chan queryAsyncResponse)
+		cl.asyncMap[1] = queryAsyncCallback(rv)
+		go cl.receiveLoop()
+		got := <-rv
+		if !cmpSlice(got.messages, tc.want, t) {
+			t.Errorf("Case %d, parsing failed.", ix)
+		}
+	}
+
+}

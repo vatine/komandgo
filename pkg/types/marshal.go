@@ -95,6 +95,19 @@ func TextNoArray(ts []TextNo) string {
 	return w.String()
 }
 
+func UInt32Array(ar []uint32) string {
+	var b strings.Builder
+	w := &b
+
+	fmt.Fprintf(w, "%d { ", len(ar))
+	for _, v := range ar {
+		fmt.Fprintf(w, "%d ", v)
+	}
+	fmt.Fprintf(w, "}")
+
+	return w.String()
+}
+
 func StringTime(when time.Time) string {
 	sec := when.Second()
 	min := when.Minute()
