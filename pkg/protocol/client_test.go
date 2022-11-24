@@ -6,9 +6,13 @@ import (
 	"testing"
 
 	"bytes"
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
+
+	"github.com/vatine/komandgo/pkg/types"
 )
 
 func TestReadUInt(t *testing.T) {
@@ -92,6 +96,234 @@ func TestGetMarksResponse(t *testing.T) {
 			if test.err {
 				t.Errorf("Case #%d, expected error, saw nil", ix)
 			}
+		}
+	}
+
+}
+
+func TestGetTime(t *testing.T) {
+	cases := []struct {
+		response string
+		expected time.Time
+	}{
+		{"=1 23 47 19 17 6 97 4 197 1", time.Date(1997, time.June, 17, 19, 47, 23, 0, time.UTC)},
+	}
+
+	for ix, c := range cases {
+		cl := fakeClient(c.response)
+		rv := make(chan time.Time)
+		cl.asyncMap[1] = timeResponseCallback(rv)
+		go cl.receiveLoop()
+		seen := <-rv
+		if !seen.Equal(c.expected) {
+			t.Errorf("Case %d, saw %s, expected %s", ix, seen, c.expected)
+		}
+	}
+}
+
+func TestGetPersonStat(t *testing.T) {
+}
+
+func cmpConfZInfo(saw, want types.ConfZInfo, t *testing.T) bool {
+	ok := true
+	if saw.Name != want.Name {
+		t.Errorf("saw name «%s», want «%s»", saw.Name, want.Name)
+		ok = false
+	}
+
+	if saw.No != want.No {
+		t.Errorf("saw confNo %d, want %d", saw.No, want.No)
+	}
+
+	return ok
+}
+
+func TestReZLookup(t *testing.T) {
+	cases := []struct {
+		response string
+		expected zConfArrayResponse
+	}{
+		{
+			"=1 2 { 15HTest Conference 0000 10 21HTrains (-) Discussion 0000 11 }",
+			zConfArrayResponse{
+				confs: []types.ConfZInfo{
+					types.ConfZInfo{
+						Name: "Test Conference",
+						No:   10,
+						Type: types.ConfType{},
+					},
+					types.ConfZInfo{
+						Name: "Trains (-) Discussion",
+						No:   11,
+						Type: types.ConfType{},
+					},
+				},
+				err: nil,
+			},
+		},
+		{
+			"=1 4 { 15HTest Conference 0000 10 11HDavid Byers 1001 6 21HTrains (-) Discussion 0000 11 4HJohn 1001 9 }",
+			zConfArrayResponse{
+				confs: []types.ConfZInfo{
+					types.ConfZInfo{
+						Name: "Test Conference",
+						No:   10,
+						Type: types.ConfType{},
+					},
+					types.ConfZInfo{
+						Name: "David Byers",
+						No:   6,
+						Type: types.ConfType{
+							RdProt:    true,
+							LetterBox: true,
+						},
+					},
+					types.ConfZInfo{
+						Name: "Trains (-) Discussion",
+						No:   11,
+						Type: types.ConfType{},
+					},
+					types.ConfZInfo{
+						Name: "John",
+						No:   9,
+						Type: types.ConfType{
+							RdProt:    true,
+							LetterBox: true,
+						},
+					},
+				},
+				err: nil,
+			},
+		},
+	}
+
+	for ix, c := range cases {
+		fmt.Printf("z-conf case %d\n", ix)
+		cl := fakeClient(c.response)
+		rv := make(chan zConfArrayResponse)
+		cl.asyncMap[1] = zConfArrayResponseCallback(rv)
+		go cl.receiveLoop()
+
+		seen := <-rv
+		close(cl.shutdown)
+
+		if len(seen.confs) != len(c.expected.confs) {
+			t.Errorf("Case #%d, conf array length mismatch", ix)
+			continue
+		}
+
+		for cIx, got := range seen.confs {
+			want := c.expected.confs[cIx]
+			if !cmpConfZInfo(got, want, t) {
+				t.Errorf("Case #%d, conf %d mismatch, saw %v, want %v", ix, cIx, got, want)
+			}
+		}
+	}
+
+}
+
+func cmpUconf(a, b types.UConference, t *testing.T) bool {
+	if a.Name != b.Name {
+		t.Errorf("  name differs, saw «%s», want «%s»", a.Name, b.Name)
+		return false
+	}
+
+	if a.Type.Repr() != b.Type.Repr() {
+		t.Errorf("  Type differs, saw %+v, want %+v", a.Type, b.Type)
+		return false
+	}
+
+	if a.HighestLocalNo != b.HighestLocalNo {
+		return false
+	}
+
+	if a.Nice != b.Nice {
+		return false
+	}
+
+	return true
+}
+
+func TestGetUConfStat(t *testing.T) {
+	cases := []struct {
+		response string
+		want     types.UConference
+	}{
+		{
+			"=1 8HTestconf 00001000 6 77",
+			types.UConference{
+				Name:           "Testconf",
+				Type:           types.ExtendedConfType{AllowAnonymous: true},
+				HighestLocalNo: 6,
+				Nice:           77,
+			},
+		},
+		{
+			"=1 11HDavid Byers 11111000 0 77",
+			types.UConference{
+				Name: "David Byers",
+				Type: types.ExtendedConfType{
+					RdProt:         true,
+					Original:       true,
+					Secret:         true,
+					LetterBox:      true,
+					AllowAnonymous: true,
+				},
+				HighestLocalNo: 0,
+				Nice:           77,
+			},
+		},
+	}
+
+	for ix, c := range cases {
+		cl := fakeClient(c.response)
+		rv := make(chan uConfResponse)
+		cl.asyncMap[1] = uConfResponseCallback(rv)
+		go cl.receiveLoop()
+		seen := <-rv
+		if !cmpUconf(seen.uConf, c.want, t) {
+			t.Errorf("Case #%d, unexpected uconference, saw %+v, want %+v", ix, seen.uConf, c.want)
+		}
+	}
+}
+
+func cmpSlice(got []uint32, want []uint32, t *testing.T) bool {
+	if len(got) != len(want) {
+		t.Errorf("slice lengths differ")
+		return false
+	}
+
+	for ix, gVal := range got {
+		wVal := want[ix]
+
+		if gVal != wVal {
+			t.Errorf("at index %d, got %d and want %d", ix, gVal, wVal)
+			return false
+		}
+	}
+
+	return true
+}
+
+func TestGetQueryAsync(t *testing.T) {
+	cases := []struct {
+		response string
+		want     []uint32
+	}{
+		{
+			"=1 7 { 0 5 7 9 11 12 13 }",
+			[]uint32{0, 5, 7, 9, 11, 12, 13},
+		},
+	}
+
+	for ix, tc := range cases {
+		cl := fakeClient(tc.response)
+		rv := make(chan queryAsyncResponse)
+		cl.asyncMap[1] = queryAsyncCallback(rv)
+		go cl.receiveLoop()
+		got := <-rv
+		if !cmpSlice(got.messages, tc.want, t) {
+			t.Errorf("Case %d, parsing failed.", ix)
 		}
 	}
 

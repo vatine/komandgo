@@ -44,6 +44,9 @@ func Scan(source io.Reader) (string, error) {
 			return "", e
 		}
 
+		if b == ' ' {
+			continue
+		}
 		done = (b == 'H')
 		if !done {
 			p := strings.IndexByte("0123456789", b)
@@ -73,4 +76,33 @@ func Scan(source io.Reader) (string, error) {
 	}
 
 	return string(rv), nil
+}
+
+// Parse a Hollerith string from a specified offset in a passed-in
+// source string, return the parsed string and the offset at which it
+// ends.
+func FromString(source string, offset int) (string, int) {
+	var len int
+
+	done := false
+	ix := offset
+
+	for !done {
+		if source[ix] == 'H' {
+			done = true
+			continue
+		}
+
+		c := source[ix]
+		p := strings.IndexByte("0123456789", c)
+		if p >= 0 {
+			len = len*10 + p
+		}
+		ix++
+	}
+
+	ix++
+	rv := source[ix : ix+len]
+
+	return rv, ix + len
 }

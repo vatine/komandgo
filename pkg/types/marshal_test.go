@@ -2,6 +2,8 @@ package types
 
 import (
 	"testing"
+
+	"time"
 )
 
 func TestPrivBits(t *testing.T) {
@@ -36,6 +38,23 @@ func TestTextNoSlice(t *testing.T) {
 		seen := TextNoArray(c.slice)
 		if seen != c.expected {
 			t.Errorf("case #%d, saw <%s> expected <%s>", ix, seen, c.expected)
+		}
+	}
+}
+
+func TestTimeMarshalling(t *testing.T) {
+	loc, _ := time.LoadLocation("Europe/Stockholm")
+	cases := []struct {
+		when time.Time
+		want string
+	}{
+		{time.Date(1997, 7, 19, 22, 6, 49, 0, loc), "49 6 22 19 6 97 6 199 1"},
+	}
+
+	for ix, c := range cases {
+		saw := StringTime(c.when)
+		if saw != c.want {
+			t.Errorf("Case #%d, saw %s, want %s", ix, saw, c.want)
 		}
 	}
 }

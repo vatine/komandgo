@@ -67,6 +67,7 @@ func TestScanning(t *testing.T) {
 		{"3H1H1", "1H1", false},
 		{"13%Hhalvah", "", true},
 		{"4Hräksmörgås", "räk", false},
+		{" 4Hräksmörgås", "räk", false},
 	}
 
 	for ix, td := range testData {
@@ -84,5 +85,33 @@ func TestScanning(t *testing.T) {
 			t.Errorf("Saw %s, expected %s, ix %d", seen, td.expected, ix)
 		}
 
+	}
+}
+
+func TestStringScanning(t *testing.T) {
+	cases := []struct {
+		source     string
+		offset     int
+		wantString string
+		wantOffset int
+	}{
+		{"3HHej", 0, "Hej", 5},
+		{" 3HHej", 0, "Hej", 6},
+		{" 3HHej", 1, "Hej", 6},
+		{"15HStoppa in text!", 0, "Stoppa in text!", 18},
+		{"15HStoppa in text!", 1, "Stopp", 8},
+	}
+
+	for ix, c := range cases {
+		ws := c.wantString
+		wOff := c.wantOffset
+
+		gs, gOff := FromString(c.source, c.offset)
+		if gs != ws {
+			t.Errorf("Case #%d, got «%s» want «%s»", ix, gs, ws)
+		}
+		if gOff != wOff {
+			t.Errorf("Case #%d, got %d, want %d", ix, gOff, wOff)
+		}
 	}
 }
