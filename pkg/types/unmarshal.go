@@ -49,6 +49,7 @@ func ReadPersonalFlags(r io.Reader) PersonalFlags {
 	return rv
 }
 
+// Read a KOM uint32 arary from a reader.
 func ReadUInt32Array(r io.Reader) ([]uint32, error) {
 	var rv []uint32
 
